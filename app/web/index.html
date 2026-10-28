@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Qwen3-TTS · clone a voice in your browser</title>
+  <meta name="description" content="Qwen3-TTS-12Hz-0.6B-Base running on this device's CPU, compiled to WebAssembly with fusor-ai. Your voice clips and your text never leave the page.">
+  <link rel="icon" href="/brand/qwen3-tts.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/base.css">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <App state="{{ App::new() }}">
+    <script type="module" src="./app.js"></script>
+    <main on:engine="state.receive(event)" data-phase="{{ state.phase.get().name() }}">
+      <header class="masthead">
+        <div class="lockup">
+          <img src="/brand/fusor-ai.svg" alt="fusor-ai" width="40" height="40">
+          <span class="times" aria-hidden="true">×</span>
+          <img src="/brand/qwen3-tts.svg" alt="" width="36" height="36">
+          <span class="wordmark">Qwen3-TTS</span>
+        </div>
+        <h1>Clone a voice from a short clip, on your own CPU</h1>
+        <p class="lede">Qwen3-TTS-12Hz-0.6B-Base compiled to WebAssembly with fusor-ai. Give it a few seconds of a voice, type a text in one of ten languages, and it speaks it in that voice as it computes. Once the model is loaded, neither the clip nor the text leaves the page.</p>
+      </header>
+
+      <If condition="{{ state.phase.get() == Phase::Loading }}">
+        <section class="card loading" aria-live="polite">
+          <div class="row"><strong>Loading the model</strong><span id="detail" class="muted">{{ state.detail.get() }}</span></div>
+          <progress max="1" value="{{ state.fraction.get() }}"></progress>
+        </section>
+      </If>
+
+      <If condition="{{ state.phase.get() == Phase::Broken }}">
+        <section class="card broken" role="alert">
+          <strong>{{ if state.failed_to_load() { "The model could not load" } else { "The engine stopped" } }}</strong>
+          <p id="detail">{{ state.detail.get() }}</p>
+          <If condition="{{ state.failed_to_load() }}">
+            <p class="muted">A bundle loads only into the runtime built with it. If you built this page yourself, rebuild both with <code>just build</code>.</p>
+          </If>
+          <div class="row"><a id="reload" class="control primary" href="">Reload</a></div>
+        </section>
+      </If>
+
+      <section class="card voice-card">
+        <div class="row heading">
+          <strong>Voice</strong>
+          <span class="muted">{{ state.voice_hint() }}</span>
+        </div>
+        <label class="dropzone" for="voice-file">
+          <input id="voice-file" type="file" accept="audio/*">
+          <span><strong>Drop an audio clip</strong> or choose a file</span>
+        </label>
+        <div class="row">
+          <button id="record" type="button" class="control" hidden="{{ state.recording.get() }}">Record</button>
+          <button id="stop-record" type="button" class="control primary" hidden="{{ !state.recording.get() }}">Stop recording</button>
+          <span class="muted">or record yourself, here, in this page</span>
+        </div>
+        <canvas id="voice-wave" aria-label="Waveform of the voice clip"></canvas>
+        <div class="row">
+          <span id="voice-seconds" class="mono">{{ state.voice_length() }}</span>
+          <span id="voice-ok" class="ok" hidden="{{ !state.voice_ok() }}" aria-label="The clip is long enough">✓</span>
+          <span id="voice-note" class="muted">{{ state.voice_note.get() }}</span>
+        </div>
+
+        <label for="transcript">Transcript <span class="muted">(optional)</span></label>
+        <textarea id="transcript" class="field" rows="2" maxlength="1000" placeholder="Add what the clip says for a closer clone" bind="state.transcript"></textarea>
+
+        <div class="row save">
+          <input id="voice-name" class="field" type="text" maxlength="40" placeholder="Name this voice to keep it on this device" bind="state.voice_name">
+          <button id="save-voice" type="button" class="control" disabled="{{ !state.can_save() }}">Save voice</button>
+        </div>
+        <div class="voices" hidden="{{ state.saved.get().is_empty() }}">
+          <ForEach items="{{ state.saved.get() }}" key="{{ |voice| voice.id.clone() }}">
+            <span class="voice" data-name="{{ item.get().name }}" data-id="{{ item.get().id }}"><button type="button" class="use">{{ item.get().name }}</button><button type="button" class="delete" aria-label="Delete this voice">×</button></span>
+          </ForEach>
+        </div>
+      </section>
+
+      <section class="card compose">
+        <label for="text">Text</label>
+        <textarea id="text" class="field" rows="3" maxlength="1000" bind="state.text"></textarea>
+
+        <div class="knob">
+          <label for="language">Language</label>
+          <select id="language" class="field" bind="state.language">
+            <option value="english">English</option>
+            <option value="chinese">Chinese</option>
+            <option value="german">German</option>
+            <option value="italian">Italian</option>
+            <option value="portuguese">Portuguese</option>
+            <option value="spanish">Spanish</option>
+            <option value="japanese">Japanese</option>
+            <option value="korean">Korean</option>
+            <option value="french">French</option>
+            <option value="russian">Russian</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <button id="generate" type="button" class="control primary" disabled="{{ !state.can_generate() }}" on:click="state.generate()">{{ state.generate_label() }}</button>
+          <button id="stop" type="button" class="control" disabled="{{ !state.can_stop() }}" on:click="state.stop()">Stop</button>
+          <span id="status" class="muted" aria-live="polite">{{ state.status.get() }}</span>
+        </div>
+      </section>
+
+      <If condition="{{ state.measured.get() }}">
+        <section class="card live" data-playing="{{ state.playing.get() }}">
+          <canvas id="wave" aria-label="Waveform of the generated speech"></canvas>
+          <dl class="metrics">
+            <div><dt>Load</dt><dd id="load">{{ state.load_time() }}</dd><dd class="muted">{{ state.load_source() }}</dd></div>
+            <div><dt>First audio</dt><dd id="heard">{{ state.metrics.get().heard() }}</dd><dd class="muted">from the click</dd></div>
+            <div><dt>RTF</dt><dd id="rtf">{{ state.metrics.get().real_time_factor() }}</dd><dd class="muted">{{ state.metrics.get().speedup() }}</dd></div>
+            <div><dt>Network</dt><dd id="requests">{{ state.metrics.get().requests }}</dd><dd class="muted">requests since the model loaded</dd></div>
+          </dl>
+          <p class="muted">{{ state.metrics.get().audio() }}</p>
+          <Match value="{{ state.audio.get() }}">
+            <Case pattern="Some(url)">
+              <div class="row">
+                <audio controls src="{{ url.get() }}"></audio>
+                <a id="download" class="control" download="qwen3-tts.wav" href="{{ url.get() }}">Download WAV</a>
+              </div>
+            </Case>
+            <Case pattern="None"></Case>
+          </Match>
+        </section>
+      </If>
+
+      <footer class="muted">
+        <span id="runtime">{{ state.summary() }}</span>
+        <span>Built with <a href="https://github.com/fusor-rs/fusor-ai">fusor-ai</a> and <a href="https://fusor.build">fusor</a> · <a href="https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base">model</a> · <a href="https://github.com/fusor-rs/qwen3-tts-wasm">source</a></span>
+      </footer>
+    </main>
+  </App>
+</body>
+</html>

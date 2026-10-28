@@ -1,0 +1,22 @@
+{
+  "icl_english": {
+    "text": "The morning train was late again, so we walked along the river and talked about the summer.",
+    "language": "english",
+    "reference_text": "Brion saw something close to panic on his opponent's face when the man finally recognized his error."
+  },
+  "icl_chinese": {
+    "text": "今天天气很好，我们一起去公园散步，然后在湖边喝杯咖啡。",
+    "language": "chinese",
+    "reference_text": "Brion saw something close to panic on his opponent's face when the man finally recognized his error."
+  },
+  "xvector_english": {
+    "text": "The morning train was late again, so we walked along the river and talked about the summer.",
+    "language": "english",
+    "reference_text": ""
+  },
+  "xvector_chinese": {
+    "text": "今天天气很好，我们一起去公园散步，然后在湖边喝杯咖啡。",
+    "language": "chinese",
+    "reference_text": ""
+  }
+}
