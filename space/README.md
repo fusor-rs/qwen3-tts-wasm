@@ -1,6 +1,6 @@
 ---
 title: qwen3-tts-wasm
-short_description: Clone a voice from a short clip and speak 10 languages on your CPU
+short_description: Voice cloning in 10 languages on your CPU
 sdk: static
 app_file: index.html
 pinned: false
